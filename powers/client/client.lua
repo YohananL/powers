@@ -101,7 +101,7 @@ RegisterCommand('+push', function()
     -- Wait until the ped stops moving and is no longer in the air
     repeat
         Wait(500)
-    until GetEntitySpeed(searchBallObj) == 0
+    until GetEntitySpeed(ped) == 0
     while IsEntityInAir(ped) do
         Wait(500)
     end

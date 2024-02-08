@@ -32,7 +32,7 @@ RegisterNetEvent('powers:server:unfreezeEntity', function(netId)
     FreezeEntityPosition(entity, false)
 end)
 
----
+--- Clear ped tasks
 --- @param netId integer
 RegisterNetEvent('powers:server:cleartasks', function(netId)
     local entity = NetworkGetEntityFromNetworkId(netId)
