@@ -4,8 +4,6 @@
 
 local playerPed = PlayerPedId()
 
-local pointAnimation = { name = 'task_mp_pointing', dictionary = 'anim@mp_point', }
-
 --- ============================
 ---           Helpers
 --- ============================
@@ -40,7 +38,10 @@ function getMutlipliers(currentHeading)
     return mainMultiplier, subMultiplier
 end
 
---- Push
+--- ============================
+---            Push
+--- ============================
+
 RegisterKeyMapping('+push', 'Push', 'keyboard', Config.Settings.pushBind)
 RegisterCommand('+push', function()
     -- Get ped in front of player using raycast
@@ -53,7 +54,7 @@ RegisterCommand('+push', function()
     -- Get ped's current velocity
     local x = 0.0
     local y = 0.0
-    local z = 0.0
+    local z = Config.Settings.velocity
 
     -- Get player's heading
     local heading = GetEntityHeading(playerPed)
@@ -63,77 +64,65 @@ RegisterCommand('+push', function()
     if heading <= 180 then
         if heading <= 90 then
             -- North West
-            if heading <= 45 then
-                y = y + subMultiplier
-                x = x - mainMultiplier
-            else
-                y = y + subMultiplier
-                x = x - mainMultiplier
-            end
+            x = x - mainMultiplier
+            y = y + subMultiplier
         else
             -- South West
-            if heading <= 135 then
-                x = x - subMultiplier
-                y = y - mainMultiplier
-            else
-                x = x - subMultiplier
-                y = y - mainMultiplier
-            end
+            x = x - subMultiplier
+            y = y - mainMultiplier
         end
     else
         if heading <= 270 then
             -- South East
-            if heading <= 225 then
-                x = x + mainMultiplier
-                y = y - subMultiplier
-            else
-                x = x + mainMultiplier
-                y = y - subMultiplier
-            end
+            x = x + mainMultiplier
+            y = y - subMultiplier
         else
             -- North East
-            if heading <= 315 then
-                x = x + subMultiplier
-                y = y + mainMultiplier
-            else
-                x = x + subMultiplier
-                y = y + mainMultiplier
-            end
+            x = x + subMultiplier
+            y = y + mainMultiplier
         end
     end
 
-    -- Set ped to invincible first
+    local netId = NetworkGetNetworkIdFromEntity(ped)
+
+    -- Set ped to ragdoll
+    TriggerServerEvent('powers:server:setpedtoragdoll', netId)
+
+    -- Set ped to invincible
     SetEntityInvincible(ped, true)
 
-    -- Set ragdoll
-    SetPedToRagdoll(ped, 3000, 3000, 0, false, false, false)
+    -- Set velocity on client and server
+    SetEntityVelocity(ped, x, y, z)
 
-    -- Set velocity
-    SetEntityVelocity(ped,
-        x,
-        y,
-        z + Config.Settings.velocity / 2)
+    -- Set ped velocity
+    TriggerServerEvent('powers:server:push', netId, x, y, z)
+    Wait(1000)
 
-    -- Wait for ped to come down
+    -- Wait until the ped stops moving and is no longer in the air
+    repeat
+        Wait(500)
+    until GetEntitySpeed(searchBallObj) == 0
     while IsEntityInAir(ped) do
         Wait(500)
     end
 
-    -- Make ped not invincible anymore
+    -- Revert invincible
     SetEntityInvincible(ped, false)
+
+    -- OOF
+    TriggerEvent('QBCore:Notify', 'Oof...', 'success',
+        2500)
 end, false)
 
 
--- local dictionary = 'missheist_agency2ahands_up'
--- local name = 'handsup_loop'
--- local dictionary = 'mp_am_hold_up'
--- local name = 'guard_handsup_loop'
-local dictionary = 'mp_missheist_countrybank@cower'
-local name = 'cower_loop'
+--- ============================
+---           Freeze
+--- ============================
 
 local frozenEntity
+local dictionary = 'nm@hands'
+local name = 'hands_up'
 
---- Freeze
 RegisterKeyMapping('+freeze', 'Freeze', 'keyboard', Config.Settings.freezeBind)
 RegisterCommand('+freeze', function()
     -- Get entity in front of player using raycast
@@ -144,21 +133,24 @@ RegisterCommand('+freeze', function()
 
     -- If human
     if GetEntityType(frozenEntity) == 1 then
+        ClearPedTasksImmediately(frozenEntity)
+
         RequestAnimDict(dictionary)
         repeat
             Wait(100)
         until HasAnimDictLoaded(dictionary)
 
-        ClearPedTasksImmediately(frozenEntity)
+        local x, y, z = table.unpack(GetEntityCoords(frozenEntity))
+        local rotX, rotY, rotZ = table.unpack(GetEntityRotation(frozenEntity))
 
-        TaskPlayAnim(frozenEntity, dictionary, name,
-            8.0, 8.0, -1, 1, 1.0, false, false, false)
+        TaskPlayAnimAdvanced(frozenEntity, dictionary, name,
+            x, y, z + 0.5, rotX, rotY, rotZ,
+            8.0, 8.0, -1, 2, 1.0, false, false)
     end
 end, false)
 
 RegisterCommand('-freeze', function()
     -- Unfreeze entity
     FreezeEntityPosition(frozenEntity, false)
-
     StopAnimTask(frozenEntity, dictionary, name, 1.0)
 end, false)
