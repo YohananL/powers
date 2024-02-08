@@ -14,7 +14,7 @@ local function GetEntInFrontOfPlayer(Ped, Distance)
     local Ent = nil
     local CoA = GetEntityCoords(Ped, true)
     local CoB = GetOffsetFromEntityInWorldCoords(Ped, 0.0, Distance, 0.0)
-    local RayHandle = CastRayPointToPoint(CoA.x, CoA.y, CoA.z, CoB.x, CoB.y, CoB.z, 10, Ped, 0)
+    local RayHandle = StartExpensiveSynchronousShapeTestLosProbe(CoA.x, CoA.y, CoA.z, CoB.x, CoB.y, CoB.z, 10, Ped, 0)
     local A, B, C, D, Ent = GetRaycastResult(RayHandle)
     return Ent
 end
@@ -123,20 +123,42 @@ RegisterCommand('+push', function()
     SetEntityInvincible(ped, false)
 end, false)
 
+
+-- local dictionary = 'missheist_agency2ahands_up'
+-- local name = 'handsup_loop'
+-- local dictionary = 'mp_am_hold_up'
+-- local name = 'guard_handsup_loop'
+local dictionary = 'mp_missheist_countrybank@cower'
+local name = 'cower_loop'
+
+local frozenEntity
+
 --- Freeze
 RegisterKeyMapping('+freeze', 'Freeze', 'keyboard', Config.Settings.freezeBind)
 RegisterCommand('+freeze', function()
-    -- Get ped in front of player using raycast
-    local ped = GetEntInFrontOfPlayer(playerPed, 5.0)
+    -- Get entity in front of player using raycast
+    frozenEntity = GetEntInFrontOfPlayer(playerPed, 5.0)
 
-    -- Freeze ped
-    FreezeEntityPosition(ped, true)
+    -- Freeze entity
+    FreezeEntityPosition(frozenEntity, true)
+
+    -- If human
+    if GetEntityType(frozenEntity) == 1 then
+        RequestAnimDict(dictionary)
+        repeat
+            Wait(100)
+        until HasAnimDictLoaded(dictionary)
+
+        ClearPedTasksImmediately(frozenEntity)
+
+        TaskPlayAnim(frozenEntity, dictionary, name,
+            8.0, 8.0, -1, 1, 1.0, false, false, false)
+    end
 end, false)
 
 RegisterCommand('-freeze', function()
-    -- Get ped in front of player using raycast
-    local ped = GetEntInFrontOfPlayer(playerPed, 5.0)
+    -- Unfreeze entity
+    FreezeEntityPosition(frozenEntity, false)
 
-    -- Freeze ped
-    FreezeEntityPosition(ped, false)
+    StopAnimTask(frozenEntity, dictionary, name, 1.0)
 end, false)
