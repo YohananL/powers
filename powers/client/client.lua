@@ -38,33 +38,13 @@ function getMutlipliers(currentHeading)
     return mainMultiplier, subMultiplier
 end
 
---- ============================
----            Push
---- ============================
-
-RegisterKeyMapping('+pushEntity', 'Push', 'keyboard', Config.Settings.pushBind)
-RegisterCommand('+pushEntity', function()
-    local ped = exports.qbUtil:raycast()
-    -- local ped = RunEntityViewThread()
-    if ped == 0 then
-        return
-    end
-
-    -- -- Get ped in front of player using raycast
-    -- local ped = GetEntInFrontOfPlayer(playerPed, 5.0)
-
-    local type = GetEntityType(ped)
-    if type ~= 1 and type ~= 2 then
-        return
-    end
-
-    -- Get ped's current velocity
+function getPushVelocity(entity)
     local x = 0.0
     local y = 0.0
     local z = Config.Settings.velocity
 
-    -- Get player's heading
-    local heading = GetEntityHeading(playerPed)
+    -- Get heading the entity is facing
+    local heading = GetEntityHeading(entity)
 
     local mainMultiplier, subMultiplier = getMutlipliers(heading)
 
@@ -90,6 +70,26 @@ RegisterCommand('+pushEntity', function()
         end
     end
 
+    return vec3(x, y, z)
+end
+
+--- ============================
+---            Push
+--- ============================
+
+RegisterKeyMapping('+pushEntity', 'Push', 'keyboard', Config.Settings.pushBind)
+RegisterCommand('+pushEntity', function()
+    local ped = exports.qbUtil:raycast()
+    -- local ped = RunEntityViewThread()
+    if ped == 0 then
+        return
+    end
+
+    local type = GetEntityType(ped)
+    if type ~= 1 and type ~= 2 then
+        return
+    end
+
     local netId = NetworkGetNetworkIdFromEntity(ped)
 
     -- Set ped to ragdoll
@@ -97,6 +97,9 @@ RegisterCommand('+pushEntity', function()
 
     -- Set ped to invincible
     SetEntityInvincible(ped, true)
+
+    -- Get the push force velocity
+    local x, y, z = table.unpack(getPushVelocity(playerPed))
 
     -- Set ped velocity
     TriggerServerEvent('powers:server:push', netId, x, y, z)
@@ -175,33 +178,23 @@ RegisterCommand('superJump', function()
 
             -- If 'spacebar' is pressed, add height to the jump
             if IsControlJustPressed(0, 22) then
-                local velocity = GetEntityVelocity(playerPed)
-                SetEntityVelocity(playerPed, velocity.x, velocity.y, velocity.z + 100)
-                print(velocity)
+                -- Get the jump force velocity
+                local x, y, z = table.unpack(getPushVelocity(playerPed))
+                SetEntityVelocity(playerPed, x, y, z)
+            end
 
-                -- Wait for ped to be in the air
-                Wait(1000)
-
-                while true do
-                    -- If 'spacebar' is pressed, add height to the jump
-                    if IsControlPressed(0, 22) then
-                        SetEntityVelocity(playerPed, 0.0, 0.0, 100.0)
-                    end
-
-                    -- If 'e' is pressed while in air, get a parachute
-                    if IsControlJustPressed(0, 38) then
-                        if IsEntityInAir(playerPed) then
-                            GiveWeaponToPed(playerPed, GetHashKey("gadget_parachute"), 1, false, false)
-                        end
-                    end
-
-                    if not IsEntityInAir(playerPed) then
-                        break;
-                    end
-
-                    Wait(0)
+            if not GetIsPedGadgetEquipped(playerPed, GetHashKey("gadget_parachute")) then
+                if IsEntityInAir(playerPed) then
+                    GiveWeaponToPed(playerPed, GetHashKey("gadget_parachute"), 1, false, false)
                 end
             end
+
+            -- -- If 'e' is pressed while in air, get a parachute
+            -- if IsControlJustPressed(0, 38) then
+            --     if IsEntityInAir(playerPed) then
+            --         GiveWeaponToPed(playerPed, GetHashKey("gadget_parachute"), 1, false, false)
+            --     end
+            -- end
 
             Wait(0)
         end
