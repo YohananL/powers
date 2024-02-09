@@ -42,12 +42,19 @@ end
 ---            Push
 --- ============================
 
-RegisterKeyMapping('+push', 'Push', 'keyboard', Config.Settings.pushBind)
-RegisterCommand('+push', function()
-    -- Get ped in front of player using raycast
-    local ped = GetEntInFrontOfPlayer(playerPed, 5.0)
+RegisterKeyMapping('+pushEntity', 'Push', 'keyboard', Config.Settings.pushBind)
+RegisterCommand('+pushEntity', function()
+    local ped = exports.qbUtil:raycast()
+    -- local ped = RunEntityViewThread()
+    if ped == 0 then
+        return
+    end
 
-    if GetEntityType(ped) ~= 1 then
+    -- -- Get ped in front of player using raycast
+    -- local ped = GetEntInFrontOfPlayer(playerPed, 5.0)
+
+    local type = GetEntityType(ped)
+    if type ~= 1 and type ~= 2 then
         return
     end
 
@@ -91,12 +98,8 @@ RegisterCommand('+push', function()
     -- Set ped to invincible
     SetEntityInvincible(ped, true)
 
-    -- Set velocity on client and server
-    SetEntityVelocity(ped, x, y, z)
-
     -- Set ped velocity
     TriggerServerEvent('powers:server:push', netId, x, y, z)
-    Wait(1000)
 
     -- Wait until the ped stops moving and is no longer in the air
     repeat
@@ -114,17 +117,17 @@ RegisterCommand('+push', function()
         2500)
 end, false)
 
-
 --- ============================
 ---           Freeze
 --- ============================
-
 local frozenEntity
 local dictionary = 'nm@hands'
 local name = 'hands_up'
+-- local dictionary = 'skydive@base'
+-- local name = 'free_idle'
 
-RegisterKeyMapping('+freeze', 'Freeze', 'keyboard', Config.Settings.freezeBind)
-RegisterCommand('+freeze', function()
+RegisterKeyMapping('+freezeEntity', 'Freeze', 'keyboard', Config.Settings.freezeBind)
+RegisterCommand('+freezeEntity', function()
     -- Get entity in front of player using raycast
     frozenEntity = GetEntInFrontOfPlayer(playerPed, 5.0)
 
@@ -149,8 +152,58 @@ RegisterCommand('+freeze', function()
     end
 end, false)
 
-RegisterCommand('-freeze', function()
+RegisterCommand('-freezeEntity', function()
     -- Unfreeze entity
     FreezeEntityPosition(frozenEntity, false)
     StopAnimTask(frozenEntity, dictionary, name, 1.0)
+end, false)
+
+--- ============================
+---         Super Jump
+--- ============================
+
+local superJumpEnabled = false
+local playerId = PlayerId()
+
+RegisterCommand('superJump', function()
+    superJumpEnabled = not superJumpEnabled
+
+    CreateThread(function()
+        while superJumpEnabled do
+            -- SetSuperJumpThisFrame(playerId)
+            SetPlayerInvincible(playerId, true)
+
+            -- If 'spacebar' is pressed, add height to the jump
+            if IsControlJustPressed(0, 22) then
+                local velocity = GetEntityVelocity(playerPed)
+                SetEntityVelocity(playerPed, velocity.x, velocity.y, velocity.z + 100)
+                print(velocity)
+
+                -- Wait for ped to be in the air
+                Wait(1000)
+
+                while true do
+                    -- If 'spacebar' is pressed, add height to the jump
+                    if IsControlPressed(0, 22) then
+                        SetEntityVelocity(playerPed, 0.0, 0.0, 100.0)
+                    end
+
+                    -- If 'e' is pressed while in air, get a parachute
+                    if IsControlJustPressed(0, 38) then
+                        if IsEntityInAir(playerPed) then
+                            GiveWeaponToPed(playerPed, GetHashKey("gadget_parachute"), 1, false, false)
+                        end
+                    end
+
+                    if not IsEntityInAir(playerPed) then
+                        break;
+                    end
+
+                    Wait(0)
+                end
+            end
+
+            Wait(0)
+        end
+    end)
 end, false)

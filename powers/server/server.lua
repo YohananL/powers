@@ -1,5 +1,5 @@
 --- ============================
----          NetEvents
+---            Push
 --- ============================
 
 --- Pushes the ped based on params
@@ -17,6 +17,10 @@ RegisterNetEvent('powers:server:setpedtoragdoll', function(netId)
     local CTaskNMBalance = 2
     SetPedToRagdoll(entity, 3000, 3000, CTaskNMBalance, false, false, false)
 end)
+
+--- ============================
+---           Freeze
+--- ============================
 
 --- Freeze the ped
 --- @param netId integer

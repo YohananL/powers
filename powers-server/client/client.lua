@@ -42,8 +42,8 @@ end
 ---            Push
 --- ============================
 
-RegisterKeyMapping('+push', 'Push', 'keyboard', Config.Settings.pushBind)
-RegisterCommand('+push', function()
+RegisterKeyMapping('+pushEntity', 'Push', 'keyboard', Config.Settings.pushBind)
+RegisterCommand('+pushEntity', function()
     -- Get ped in front of player using raycast
     local ped = GetEntInFrontOfPlayer(playerPed, 5.0)
 
@@ -133,8 +133,8 @@ end)
 local frozenEntity
 
 --- Freeze
-RegisterKeyMapping('+freeze', 'Freeze', 'keyboard', Config.Settings.freezeBind)
-RegisterCommand('+freeze', function()
+RegisterKeyMapping('+freezeEntity', 'Freeze', 'keyboard', Config.Settings.freezeBind)
+RegisterCommand('+freezeEntity', function()
     -- Get entity in front of player using raycast
     frozenEntity = GetEntInFrontOfPlayer(playerPed, 5.0)
 
@@ -150,7 +150,7 @@ RegisterCommand('+freeze', function()
     end
 end, false)
 
-RegisterCommand('-freeze', function()
+RegisterCommand('-freezeEntity', function()
     local netId = NetworkGetNetworkIdFromEntity(frozenEntity)
 
     -- Unfreeze entity
