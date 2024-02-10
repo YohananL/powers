@@ -1,10 +1,4 @@
 --- ============================
----           Constants
---- ============================
-
-local playerPed = PlayerPedId()
-
---- ============================
 ---           Helpers
 --- ============================
 
@@ -79,6 +73,8 @@ end
 
 RegisterKeyMapping('+pushEntity', 'Push', 'keyboard', Config.Settings.pushBind)
 RegisterCommand('+pushEntity', function()
+    local playerPed = PlayerPedId()
+
     local ped = exports.qbUtil:raycast()
     -- local ped = RunEntityViewThread()
     if ped == 0 then
@@ -166,9 +162,10 @@ end, false)
 --- ============================
 
 local superJumpEnabled = false
-local playerId = PlayerId()
 
 RegisterCommand('superJump', function()
+    local playerId = PlayerId()
+
     superJumpEnabled = not superJumpEnabled
 
     CreateThread(function()
