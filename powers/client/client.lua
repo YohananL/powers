@@ -16,7 +16,7 @@ end
 --- ============================
 
 function getMutlipliers(currentHeading)
-    local remainder
+    local remainder = 0
     if currentHeading ~= 0 then
         remainder = math.fmod(currentHeading, 90)
         if remainder == 0 then
@@ -165,6 +165,9 @@ local superJumpEnabled = false
 
 RegisterCommand('superJump', function()
     local playerId = PlayerId()
+    local playerPed = PlayerPedId()
+
+    local grenadeType = 50 -- EXP_TAG_BOMB_STANDARD
 
     superJumpEnabled = not superJumpEnabled
 
@@ -177,6 +180,11 @@ RegisterCommand('superJump', function()
                 -- Get the jump force velocity
                 local x, y, z = table.unpack(getPushVelocity(playerPed))
                 SetEntityVelocity(playerPed, x, y, z)
+
+                if not IsEntityInAir(playerPed) then
+                    local coords = GetEntityCoords(playerPed)
+                    AddExplosion(coords.x, coords.y, coords.z, grenadeType, 0, true, false, 0, true)
+                end
             end
 
             if not GetIsPedGadgetEquipped(playerPed, GetHashKey("gadget_parachute")) then
