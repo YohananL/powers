@@ -172,10 +172,9 @@ RegisterCommand('superJump', function()
     superJumpEnabled = not superJumpEnabled
 
     CreateThread(function()
-        while superJumpEnabled do
-            -- SetSuperJumpThisFrame(playerId)
-            SetPlayerInvincible(playerId, true)
+        SetPlayerInvincible(playerId, true)
 
+        while superJumpEnabled do
             -- If 'spacebar' is pressed, add height to the jump
             if IsControlJustPressed(0, 22) then
                 -- Get the jump force velocity
@@ -189,14 +188,9 @@ RegisterCommand('superJump', function()
                 end
             end
 
-            -- -- If 'e' is pressed while in air, get a parachute
-            -- if IsControlJustPressed(0, 38) then
-            --     if IsEntityInAir(playerPed) then
-            --         GiveWeaponToPed(playerPed, GetHashKey("gadget_parachute"), 1, false, false)
-            --     end
-            -- end
-
             Wait(0)
         end
+
+        SetPlayerInvincible(playerId, false)
     end)
 end, false)
