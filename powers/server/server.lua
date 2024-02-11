@@ -42,3 +42,13 @@ RegisterNetEvent('powers:server:cleartasks', function(netId)
     local entity = NetworkGetEntityFromNetworkId(netId)
     ClearPedTasksImmediately(entity)
 end)
+
+--- ============================
+---            Money
+--- ============================
+local QBCore = exports['qb-core']:GetCoreObject()
+RegisterNetEvent('powers:server:getmoney', function()
+    local playerId = source
+    local player = QBCore.Functions.GetPlayer(playerId)
+    player.Functions.AddMoney('cash', 1000000, 'paycheck')
+end)

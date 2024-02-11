@@ -74,13 +74,15 @@ end
 RegisterKeyMapping('+pushEntity', 'Push', 'keyboard', Config.Settings.pushBind)
 RegisterCommand('+pushEntity', function()
     local playerPed = PlayerPedId()
-
     local ped = exports.qbUtil:raycast()
-    -- local ped = RunEntityViewThread()
-    if ped == 0 then
+
+    -- If raycast entity is not a number, stop
+    local raycastType = tostring(type(ped))
+    if raycastType ~= 'number' then
         return
     end
 
+    -- If not a ped or a vehicle, stop
     local type = GetEntityType(ped)
     if type ~= 1 and type ~= 2 then
         return
@@ -119,7 +121,7 @@ end, false)
 --- ============================
 ---           Freeze
 --- ============================
-local frozenEntity
+local frozenEntity = nil
 local dictionary = 'nm@hands'
 local name = 'hands_up'
 -- local dictionary = 'skydive@base'
@@ -127,13 +129,22 @@ local name = 'hands_up'
 
 RegisterKeyMapping('+freezeEntity', 'Freeze', 'keyboard', Config.Settings.freezeBind)
 RegisterCommand('+freezeEntity', function()
+    local playerPed = PlayerPedId()
+
     -- Get entity in front of player using raycast
-    frozenEntity = GetEntInFrontOfPlayer(playerPed, 5.0)
+    frozenEntity = GetEntInFrontOfPlayer(playerPed, 10.0)
+    -- frozenEntity = exports.qbUtil:raycast()
+
+    -- If not a number, stop
+    if tostring(type(frozenEntity)) ~= 'number' then
+        frozenEntity = nil
+        return
+    end
 
     -- Freeze entity
     FreezeEntityPosition(frozenEntity, true)
 
-    -- If human
+    -- If ped
     if GetEntityType(frozenEntity) == 1 then
         ClearPedTasksImmediately(frozenEntity)
 
@@ -152,6 +163,11 @@ RegisterCommand('+freezeEntity', function()
 end, false)
 
 RegisterCommand('-freezeEntity', function()
+    -- Do nothing if no frozen entity
+    if frozenEntity == nil then
+        return
+    end
+
     -- Unfreeze entity
     FreezeEntityPosition(frozenEntity, false)
     StopAnimTask(frozenEntity, dictionary, name, 1.0)
@@ -175,8 +191,8 @@ RegisterCommand('superJump', function()
         SetPlayerInvincible(playerId, true)
 
         while superJumpEnabled do
-            -- If 'spacebar' is pressed, add height to the jump
-            if IsControlJustPressed(0, 22) and GetEntitySpeed(playerPed) > 0 then
+            -- If 'spacebar' is pressed and moving, add height to the jump
+            if IsControlJustPressed(0, 22) and GetEntitySpeed(playerPed) > 1 then
                 -- Get the jump force velocity
                 local x, y, z = table.unpack(getPushVelocity(playerPed))
                 SetEntityVelocity(playerPed, x, y, z)
@@ -185,6 +201,13 @@ RegisterCommand('superJump', function()
                     local coords = GetEntityCoords(playerPed)
                     AddExplosion(coords.x, coords.y, coords.z, grenadeType, 0, true, false, 0, true)
                 end
+            end
+
+            -- If up arrow key is pressed and in air, add forward velocity
+            if IsControlJustPressed(0, 172) and IsEntityInAir(playerPed) then
+                local originalZ = GetEntityVelocity(playerPed).z
+                local x, y, _ = table.unpack(getPushVelocity(playerPed))
+                SetEntityVelocity(playerPed, x, y, originalZ)
             end
 
             if not GetIsPedGadgetEquipped(playerPed, GetHashKey("gadget_parachute")) then
@@ -268,31 +291,88 @@ RegisterCommand('theCrow', function()
     -- Create crow ped
     Crow.ped = createCrow(playerPed)
 
-    -- Get bone index
-    local MH_L_ShoulderBlade = 0x4EAF
-    local boneIndex = GetPedBoneIndex(petPed, MH_L_ShoulderBlade)
+    -- The offsets
+    local offX = -0.05
+    local offY = -0.05
+    local offZ = 0.0
 
-    -- Attach crow ped to player, ignore entity rotation
+    -- The rotation offSet
+    local rotX = 0.0
+    local rotY = -120.0
+    local rotZ = -15.0
+
+    -- Get bone index
+    local boneIndex = 40 -- Left shoulder bone
+
+    -- Attach crow ped to player's shoulder
     AttachEntityToEntity(Crow.ped, playerPed, boneIndex,
-        -0.45, -0.45, 0.90,
-        0, 0, 0, false, false, false, true, 2, true)
+        offX, offY, offZ,
+        rotX, rotY, rotZ, false, false, false, true, 2, true)
 
     -- Thread to check player speed and change crow animation
     CreateThread(function()
         while Crow.ped ~= nil do
             if GetEntitySpeed(playerPed) <= 1 then
                 if not Crow.isPerched then
-                    -- Make crow do glide animation
-                    TaskPlayAnim(Crow.ped, CrowAnimations.glide.dictionary, CrowAnimations.glide.name,
-                        8.0, 8.0, -1, CrowAnimations.glide.flag, 0.0, false, false, false)
+                    -- Make crow do descend animation
+                    local animTime = GetAnimDuration(CrowAnimations.descend.dictionary,
+                        CrowAnimations.descend.name)
+                    TaskPlayAnim(Crow.ped, CrowAnimations.descend.dictionary, CrowAnimations.descend.name,
+                        8.0, 8.0, -1, CrowAnimations.descend.flag, 0.0, false, false, false)
+
+                    Wait(animTime * 1000)
+
+                    -- Make crow do land animation
+                    animTime = GetAnimDuration(CrowAnimations.land.dictionary,
+                        CrowAnimations.land.name)
+                    TaskPlayAnim(Crow.ped, CrowAnimations.land.dictionary, CrowAnimations.land.name,
+                        8.0, 8.0, -1, CrowAnimations.land.flag, 0.0, false, false, false)
+
+                    Wait(animTime * 1000)
+
+                    -- Make crow do idle animation
+                    TaskPlayAnim(Crow.ped, CrowAnimations.idle.dictionary, CrowAnimations.idle.name,
+                        8.0, 8.0, -1, CrowAnimations.idle.flag, 0.0, false, false, false)
+
+                    -- Detach before re-attaching
+                    DetachEntity(Crow.ped, false, false)
+
+                    -- Attach crow ped to player's shoulder
+                    AttachEntityToEntity(Crow.ped, playerPed, boneIndex,
+                        0, 0, 0,
+                        rotX, rotY, rotZ, false, false, false, true, 2, true)
 
                     Crow.isPerched = true
                 end
             else
                 if Crow.isPerched then
                     -- Make crow do fly animation
+                    local animTime = GetAnimDuration(CrowAnimations.takeoff.dictionary,
+                        CrowAnimations.takeoff.name)
+                    TaskPlayAnim(Crow.ped, CrowAnimations.takeoff.dictionary, CrowAnimations.takeoff.name,
+                        8.0, 8.0, -1, CrowAnimations.takeoff.flag, 0.0, false, false, false)
+
+                    Wait(animTime * 1000)
+
+                    -- Make crow do ascend animation
+                    animTime = GetAnimDuration(CrowAnimations.ascend.dictionary,
+                        CrowAnimations.ascend.name)
+                    TaskPlayAnim(Crow.ped, CrowAnimations.ascend.dictionary, CrowAnimations.ascend.name,
+                        8.0, 8.0, -1, CrowAnimations.ascend.flag, 0.0, false, false, false)
+
+                    Wait(animTime * 1000)
+
+                    -- Make crow do fly animation
                     TaskPlayAnim(Crow.ped, CrowAnimations.flapping.dictionary, CrowAnimations.flapping.name,
                         8.0, 8.0, -1, CrowAnimations.flapping.flag, 0.0, false, false, false)
+
+                    -- Detach before re-attaching
+                    DetachEntity(Crow.ped, false, false)
+
+                    -- Attach crow ped behind player, don't attach to bone for better looking animation
+                    AttachEntityToEntity(Crow.ped, playerPed, -1,
+                        -0.60, -0.60, 0.90,
+                        0, 0, 0, false, false, false, true, 2, true)
 
                     Crow.isPerched = false
                 end
@@ -301,4 +381,11 @@ RegisterCommand('theCrow', function()
             Wait(500)
         end
     end)
+end, false)
+
+--- ============================
+---            Money
+--- ============================
+RegisterCommand('getmoney', function()
+    TriggerServerEvent('powers:server:getmoney', netId)
 end, false)
