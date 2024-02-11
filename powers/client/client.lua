@@ -176,7 +176,7 @@ RegisterCommand('superJump', function()
 
         while superJumpEnabled do
             -- If 'spacebar' is pressed, add height to the jump
-            if IsControlJustPressed(0, 22) then
+            if IsControlJustPressed(0, 22) and GetEntitySpeed(playerPed) > 0 then
                 -- Get the jump force velocity
                 local x, y, z = table.unpack(getPushVelocity(playerPed))
                 SetEntityVelocity(playerPed, x, y, z)
@@ -197,5 +197,108 @@ RegisterCommand('superJump', function()
         end
 
         SetPlayerInvincible(playerId, false)
+    end)
+end, false)
+
+--- ============================
+---          The Crow
+--- ============================
+
+---  @class Crow
+local Crow = {
+    ped = nil,
+    isPerched = true,
+}
+
+local AnimationFlags =
+{
+    ANIM_FLAG_NORMAL = 0,
+    ANIM_FLAG_REPEAT = 1,
+    ANIM_FLAG_STOP_LAST_FRAME = 2,
+    ANIM_FLAG_UPPERBODY = 16,
+    ANIM_FLAG_ENABLE_PLAYER_CONTROL = 32,
+    ANIM_FLAG_CANCELABLE = 120,
+};
+
+local CrowAnimations = {
+    takeoff  = { name = 'takeoff', dictionary = 'creatures@crow@move', flag = AnimationFlags.ANIM_FLAG_STOP_LAST_FRAME },
+    land     = { name = 'land', dictionary = 'creatures@crow@move', flag = AnimationFlags.ANIM_FLAG_STOP_LAST_FRAME },
+    ascend   = { name = 'ascend', dictionary = 'creatures@crow@move', flag = AnimationFlags.ANIM_FLAG_REPEAT },
+    descend  = { name = 'descend', dictionary = 'creatures@crow@move', flag = AnimationFlags.ANIM_FLAG_REPEAT },
+    flapping = { name = 'flapping', dictionary = 'creatures@crow@move', flag = AnimationFlags.ANIM_FLAG_REPEAT },
+    glide    = { name = 'glide', dictionary = 'creatures@crow@move', flag = AnimationFlags.ANIM_FLAG_REPEAT },
+    idle     = { name = 'idle', dictionary = 'creatures@crow@move', flag = AnimationFlags.ANIM_FLAG_REPEAT },
+}
+
+function loadModel(modelHash)
+    -- Request the model and wait for it to load
+    RequestModel(modelHash)
+    repeat
+        Wait(100)
+    until HasModelLoaded(modelHash)
+end
+
+function createCrow(playerPed)
+    local crowHash = `A_C_Crow`
+
+    -- Load the model
+    loadModel(crowHash)
+
+    -- Create the object
+    local coords = GetEntityCoords(playerPed)
+    local heading = GetEntityHeading(playerPed)
+    local newCrowPed = CreatePed(0, crowHash, coords.x, coords.y, coords.z, heading, true, false)
+
+    -- Release the model
+    SetModelAsNoLongerNeeded(crowHash)
+
+    return newCrowPed
+end
+
+RegisterCommand('theCrow', function()
+    local playerPed = PlayerPedId()
+
+    -- Crow already exists, remove
+    if Crow.ped ~= nil then
+        DeleteEntity(Crow.ped)
+        Crow.ped = nil
+        return
+    end
+
+    -- Create crow ped
+    Crow.ped = createCrow(playerPed)
+
+    -- Get bone index
+    local MH_L_ShoulderBlade = 0x4EAF
+    local boneIndex = GetPedBoneIndex(petPed, MH_L_ShoulderBlade)
+
+    -- Attach crow ped to player, ignore entity rotation
+    AttachEntityToEntity(Crow.ped, playerPed, boneIndex,
+        -0.45, -0.45, 0.90,
+        0, 0, 0, false, false, false, true, 2, true)
+
+    -- Thread to check player speed and change crow animation
+    CreateThread(function()
+        while Crow.ped ~= nil do
+            if GetEntitySpeed(playerPed) <= 1 then
+                if not Crow.isPerched then
+                    -- Make crow do glide animation
+                    TaskPlayAnim(Crow.ped, CrowAnimations.glide.dictionary, CrowAnimations.glide.name,
+                        8.0, 8.0, -1, CrowAnimations.glide.flag, 0.0, false, false, false)
+
+                    Crow.isPerched = true
+                end
+            else
+                if Crow.isPerched then
+                    -- Make crow do fly animation
+                    TaskPlayAnim(Crow.ped, CrowAnimations.flapping.dictionary, CrowAnimations.flapping.name,
+                        8.0, 8.0, -1, CrowAnimations.flapping.flag, 0.0, false, false, false)
+
+                    Crow.isPerched = false
+                end
+            end
+
+            Wait(500)
+        end
     end)
 end, false)
