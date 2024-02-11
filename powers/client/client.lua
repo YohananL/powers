@@ -291,10 +291,14 @@ RegisterCommand('theCrow', function()
     -- Create crow ped
     Crow.ped = createCrow(playerPed)
 
-    -- The offsets
+    -- Idle offsets
     local offX = -0.05
     local offY = -0.05
     local offZ = 0.0
+
+    local off2X = -0.15
+    local off2Y = -0.10
+    local off2Z = 0.475
 
     -- The rotation offSet
     local rotX = 0.0
@@ -309,6 +313,11 @@ RegisterCommand('theCrow', function()
         offX, offY, offZ,
         rotX, rotY, rotZ, false, false, false, true, 2, true)
 
+    -- Flapping offsets
+    local flapX = -0.60
+    local flapY = -0.60
+    local flapZ = 0.90
+
     -- Thread to check player speed and change crow animation
     CreateThread(function()
         while Crow.ped ~= nil do
@@ -320,7 +329,21 @@ RegisterCommand('theCrow', function()
                     TaskPlayAnim(Crow.ped, CrowAnimations.descend.dictionary, CrowAnimations.descend.name,
                         8.0, 8.0, -1, CrowAnimations.descend.flag, 0.0, false, false, false)
 
-                    Wait(animTime * 1000)
+                    local x = flapX
+                    local y = flapY
+                    local z = flapZ
+                    repeat
+                        x = x + 0.00235
+                        y = y + 0.00261
+                        z = z - 0.00222
+
+                        AttachEntityToEntity(Crow.ped, playerPed, -1,
+                            x, y, z,
+                            0, 0, 0, false, false, false, true, 2, true)
+
+                        animTime = animTime - 0.007
+                        Wait(1)
+                    until animTime <= 0
 
                     -- Make crow do land animation
                     animTime = GetAnimDuration(CrowAnimations.land.dictionary,
@@ -339,7 +362,7 @@ RegisterCommand('theCrow', function()
 
                     -- Attach crow ped to player's shoulder
                     AttachEntityToEntity(Crow.ped, playerPed, boneIndex,
-                        0, 0, 0,
+                        offX, offY, offZ,
                         rotX, rotY, rotZ, false, false, false, true, 2, true)
 
                     Crow.isPerched = true
@@ -352,7 +375,21 @@ RegisterCommand('theCrow', function()
                     TaskPlayAnim(Crow.ped, CrowAnimations.takeoff.dictionary, CrowAnimations.takeoff.name,
                         8.0, 8.0, -1, CrowAnimations.takeoff.flag, 0.0, false, false, false)
 
-                    Wait(animTime * 1000)
+                    local x = off2X
+                    local y = off2Y
+                    local z = off2Z
+                    repeat
+                        x = x - 0.00235
+                        y = y - 0.00261
+                        z = z + 0.00222
+
+                        AttachEntityToEntity(Crow.ped, playerPed, -1,
+                            x, y, z,
+                            0, 0, 0, false, false, false, true, 2, true)
+
+                        animTime = animTime - 0.007
+                        Wait(1)
+                    until animTime <= 0
 
                     -- Make crow do ascend animation
                     animTime = GetAnimDuration(CrowAnimations.ascend.dictionary,
@@ -371,7 +408,7 @@ RegisterCommand('theCrow', function()
 
                     -- Attach crow ped behind player, don't attach to bone for better looking animation
                     AttachEntityToEntity(Crow.ped, playerPed, -1,
-                        -0.60, -0.60, 0.90,
+                        flapX, flapY, flapZ,
                         0, 0, 0, false, false, false, true, 2, true)
 
                     Crow.isPerched = false
