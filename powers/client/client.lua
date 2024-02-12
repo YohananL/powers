@@ -256,6 +256,29 @@ local CrowAnimations = {
     idle     = { name = 'idle', dictionary = 'creatures@crow@move', flag = AnimationFlags.ANIM_FLAG_REPEAT },
 }
 
+function requestAnimation(dictionary)
+    RequestAnimDict(dictionary)
+    repeat
+        Wait(100)
+    until HasAnimDictLoaded(dictionary)
+
+    return true
+end
+
+function unloadCrowAnimations()
+    for _, value in pairs(CrowAnimations) do
+        RemoveAnimDict(value.dictionary)
+    end
+end
+
+function loadCrowAnimations()
+    for _, value in pairs(CrowAnimations) do
+        if not (HasAnimDictLoaded(value.dictionary)) then
+            requestAnimation(value.dictionary)
+        end
+    end
+end
+
 function loadModel(modelHash)
     -- Request the model and wait for it to load
     RequestModel(modelHash)
@@ -290,6 +313,9 @@ RegisterCommand('theCrow', function()
         Crow.ped = nil
         return
     end
+
+    -- Load crow animations
+    loadCrowAnimations()
 
     -- Create crow ped
     Crow.ped = createCrow(playerPed)
@@ -434,6 +460,9 @@ RegisterCommand('theCrow', function()
             Crow.tick = Crow.tick + 1
             Wait(500)
         end
+
+        -- Unload crow animations
+        unloadCrowAnimations()
     end)
 end, false)
 
