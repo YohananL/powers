@@ -231,15 +231,12 @@ local flameOnEnabled = false
 
 RegisterCommand('flameOn', function()
     local playerPed = PlayerPedId()
-
     local grenadeType = 3 -- MOLOTOV
-
     flameOnEnabled = not flameOnEnabled
 
     CreateThread(function()
         StartEntityFire(playerPed)
         while flameOnEnabled do
-            -- StartScriptFire(coords.x, coords.y, coords.z, 1, false)
             SetEntityHealth(playerPed, 200)
             Wait(1)
         end
@@ -247,13 +244,13 @@ RegisterCommand('flameOn', function()
     end)
 
     CreateThread(function()
-        local coords
+        local coords = GetEntityCoords(playerPed)
         while flameOnEnabled do
             coords = GetEntityCoords(playerPed)
             AddExplosion(coords.x, coords.y, coords.z, grenadeType, 1.0, false, false, 0, false)
             Wait(5000)
         end
-        StopFireInRange(coords.x, coords.y, coords.z, 50.0)
+        StopFireInRange(coords.x, coords.y, coords.z, 25.0)
     end)
 end, false)
 
