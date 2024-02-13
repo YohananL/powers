@@ -224,26 +224,48 @@ RegisterCommand('superJump', function()
 end, false)
 
 --- ============================
----          The Crow
+---          Flame On
 --- ============================
 
----  @class Crow
-local Crow = {
-    ped = nil,
-    isPerched = true,
-    isGliding = false,
-    tick = 0,
-    tickMax = 5,
-}
+local flameOnEnabled = false
+
+RegisterCommand('flameOn', function()
+    local playerPed = PlayerPedId()
+
+    local grenadeType = 3 -- MOLOTOV
+
+    flameOnEnabled = not flameOnEnabled
+
+    CreateThread(function()
+        StartEntityFire(playerPed)
+        while flameOnEnabled do
+            -- StartScriptFire(coords.x, coords.y, coords.z, 1, false)
+            SetEntityHealth(playerPed, 200)
+            Wait(1)
+        end
+        StopEntityFire(playerPed)
+    end)
+
+    CreateThread(function()
+        local coords
+        while flameOnEnabled do
+            coords = GetEntityCoords(playerPed)
+            AddExplosion(coords.x, coords.y, coords.z, grenadeType, 1.0, false, false, 0, false)
+            Wait(5000)
+        end
+        StopFireInRange(coords.x, coords.y, coords.z, 50.0)
+    end)
+end, false)
+
+--- ============================
+---          The Crow
+--- ============================
 
 local AnimationFlags =
 {
     ANIM_FLAG_NORMAL = 0,
     ANIM_FLAG_REPEAT = 1,
     ANIM_FLAG_STOP_LAST_FRAME = 2,
-    ANIM_FLAG_UPPERBODY = 16,
-    ANIM_FLAG_ENABLE_PLAYER_CONTROL = 32,
-    ANIM_FLAG_CANCELABLE = 120,
 };
 
 local CrowAnimations = {
@@ -287,7 +309,32 @@ function loadModel(modelHash)
     until HasModelLoaded(modelHash)
 end
 
-function createCrow(playerPed)
+---  @class Crow
+local Crow = {
+    ped = nil,
+    isPerched = true,
+    isGliding = false,
+    switchFlyTick = 0,
+    switchFlyTickMax = 5,
+
+    -- Idle offsets and rotation
+    idleX = -0.05,
+    idleY = -0.05,
+    idleZ = 0.0,
+    rotX = 0.0,
+    rotY = -120.0,
+    rotZ = -15.0,
+
+    -- Flapping offsets
+    flapStartX = -0.15,
+    flapStartY = -0.10,
+    flapStartZ = 0.475,
+    flapEndBaseX = -0.90,
+    flapEndBaseY = -0.90,
+    flapEndBaseZ = 0.90,
+}
+
+function Crow:createCrow(playerPed)
     local crowHash = `A_C_Crow`
 
     -- Load the model
@@ -296,7 +343,7 @@ function createCrow(playerPed)
     -- Create the object
     local coords = GetEntityCoords(playerPed)
     local heading = GetEntityHeading(playerPed)
-    local newCrowPed = CreatePed(0, crowHash, coords.x, coords.y, coords.z, heading, true, false)
+    local newCrowPed = CreatePed(0, crowHash, coords.x, coords.y, coords.z + -50, heading, true, false)
 
     -- Release the model
     SetModelAsNoLongerNeeded(crowHash)
@@ -304,160 +351,202 @@ function createCrow(playerPed)
     return newCrowPed
 end
 
-RegisterCommand('theCrow', function()
-    local playerPed = PlayerPedId()
+function Crow:descend(playerPed, descendTicks, flapOffsetMultiplier)
+    local flapEndX = Crow.flapEndBaseX * flapOffsetMultiplier
+    local flapEndY = Crow.flapEndBaseY * flapOffsetMultiplier
+    local flapEndZ = Crow.flapEndBaseZ * flapOffsetMultiplier
 
-    -- Crow already exists, remove
-    if Crow.ped ~= nil then
-        DeleteEntity(Crow.ped)
-        Crow.ped = nil
-        return
-    end
+    -- Flapping offset increments
+    local flapIncrementX = (flapEndX - Crow.flapStartX) / descendTicks
+    local flapIncrementY = (flapEndY - Crow.flapStartY) / descendTicks
+    local flapIncrementZ = (flapEndZ - Crow.flapStartZ) / descendTicks
 
-    -- Load crow animations
-    loadCrowAnimations()
+    -- Make crow do descend animation
+    TaskPlayAnim(Crow.ped, CrowAnimations.descend.dictionary, CrowAnimations.descend.name,
+        8.0, 8.0, -1, CrowAnimations.descend.flag, 0.0, false, false, false)
 
-    -- Create crow ped
-    Crow.ped = createCrow(playerPed)
+    local x = flapEndX
+    local y = flapEndY
+    local z = flapEndZ
+    repeat
+        x = x - flapIncrementX
+        y = y - flapIncrementY
+        z = z - flapIncrementZ
 
-    -- Idle offsets
-    local idleX = -0.05
-    local idleY = -0.05
-    local idleZ = 0.0
+        AttachEntityToEntity(Crow.ped, playerPed, -1,
+            x, y, z,
+            0, 0, 0, false, false, false, true, 2, true)
 
-    -- The rotation offSet
-    local rotX = 0.0
-    local rotY = -120.0
-    local rotZ = -15.0
+        Wait(1)
+    until x >= Crow.flapStartX and y >= Crow.flapStartY and z <= Crow.flapStartZ
+
+    -- Make crow do land animation
+    local animTime = GetAnimDuration(CrowAnimations.land.dictionary,
+        CrowAnimations.land.name)
+    TaskPlayAnim(Crow.ped, CrowAnimations.land.dictionary, CrowAnimations.land.name,
+        8.0, 8.0, -1, CrowAnimations.land.flag, 0.0, false, false, false)
+
+    Wait(animTime * 1000)
+
+    -- Make crow do idle animation
+    TaskPlayAnim(Crow.ped, CrowAnimations.idle.dictionary, CrowAnimations.idle.name,
+        8.0, 8.0, -1, CrowAnimations.idle.flag, 0.0, false, false, false)
+
+    -- Detach before re-attaching
+    DetachEntity(Crow.ped, false, false)
 
     -- Get bone index
     local boneIndex = 40 -- Left shoulder bone
 
     -- Attach crow ped to player's shoulder
     AttachEntityToEntity(Crow.ped, playerPed, boneIndex,
-        idleX, idleY, idleZ,
-        rotX, rotY, rotZ, false, false, false, true, 2, true)
+        Crow.idleX, Crow.idleY, Crow.idleZ,
+        Crow.rotX, Crow.rotY, Crow.rotZ, false, false, false, true, 2, true)
 
-    -- Flapping offsets
-    local flapStartX = -0.15
-    local flapStartY = -0.10
-    local flapStartZ = 0.475
+    Crow.isPerched = true
+end
 
-    local flapEndX = -0.90
-    local flapEndY = -0.90
-    local flapEndZ = 0.90
-
+function Crow:ascend(playerPed, ascendTicks, flapOffsetMultiplier, isExit)
     -- Flapping offset increments
-    local flapIncrementX = (flapEndX - flapStartX) / 200
-    local flapIncrementY = (flapEndY - flapStartY) / 200
-    local flapIncrementZ = (flapEndZ - flapStartZ) / 200
+    local flapIncrementX = (Crow.flapEndBaseX * flapOffsetMultiplier - Crow.flapStartX) / ascendTicks
+    local flapIncrementY = (Crow.flapEndBaseY * flapOffsetMultiplier - Crow.flapStartY) / ascendTicks
+    local flapIncrementZ = (Crow.flapEndBaseZ * flapOffsetMultiplier - Crow.flapStartZ) / ascendTicks
+
+    -- Make crow do fly animation
+    TaskPlayAnim(Crow.ped, CrowAnimations.takeoff.dictionary, CrowAnimations.takeoff.name,
+        8.0, 8.0, -1, CrowAnimations.takeoff.flag, 0.0, false, false, false)
+
+    local x = Crow.flapStartX
+    local y = Crow.flapStartY
+    local z = Crow.flapStartZ
+
+    if isExit then
+        repeat
+            x = x + flapIncrementX
+            y = y - flapIncrementY
+            z = z + flapIncrementZ
+
+            AttachEntityToEntity(Crow.ped, playerPed, -1,
+                x, y, z,
+                0, 0, 0, false, false, false, true, 2, true)
+
+            Wait(1)
+        until z >= Crow.flapEndBaseZ
+    else
+        repeat
+            x = x + flapIncrementX
+            y = y + flapIncrementY
+            z = z + flapIncrementZ
+
+            AttachEntityToEntity(Crow.ped, playerPed, -1,
+                x, y, z,
+                0, 0, 0, false, false, false, true, 2, true)
+
+            Wait(1)
+        until x <= Crow.flapEndBaseX and y <= Crow.flapEndBaseY and z >= Crow.flapEndBaseZ
+    end
+
+    -- Make crow do ascend animation
+    TaskPlayAnim(Crow.ped, CrowAnimations.ascend.dictionary, CrowAnimations.ascend.name,
+        8.0, 8.0, -1, CrowAnimations.ascend.flag, 0.0, false, false, false)
+
+    if isExit then
+        repeat
+            x = x + flapIncrementX
+            y = y - flapIncrementY
+            z = z + flapIncrementZ
+
+            AttachEntityToEntity(Crow.ped, playerPed, -1,
+                x, y, z,
+                0, 0, 0, false, false, false, true, 2, true)
+
+            Wait(1)
+        until z >= Crow.flapEndBaseZ * 10
+    else
+        Wait(GetAnimDuration(CrowAnimations.ascend.dictionary,
+            CrowAnimations.ascend.name) * 1000)
+    end
+
+    -- Detach before re-attaching
+    DetachEntity(Crow.ped, false, false)
+
+    if not isExit then
+        -- Make crow do fly animation
+        TaskPlayAnim(Crow.ped, CrowAnimations.flapping.dictionary, CrowAnimations.flapping.name,
+            8.0, 8.0, -1, CrowAnimations.flapping.flag, 0.0, false, false, false)
+
+        -- Attach crow ped behind player, don't attach to bone for better looking animation
+        AttachEntityToEntity(Crow.ped, playerPed, -1,
+            Crow.flapEndBaseX, Crow.flapEndBaseY, Crow.flapEndBaseZ,
+            0, 0, 0, false, false, false, true, 2, true)
+    end
+
+    Crow.isPerched = false
+    Crow.switchFlyTick = 0
+end
+
+function Crow:switchFlyAnimation()
+    if Crow.switchFlyTick == Crow.switchFlyTickMax then
+        if Crow.isGliding then
+            TaskPlayAnim(Crow.ped, CrowAnimations.flapping.dictionary, CrowAnimations.flapping.name,
+                8.0, 8.0, -1, CrowAnimations.flapping.flag, 0.0, false, false, false)
+        else
+            TaskPlayAnim(Crow.ped, CrowAnimations.glide.dictionary, CrowAnimations.glide.name,
+                8.0, 8.0, -1, CrowAnimations.glide.flag, 0.0, false, false, false)
+        end
+
+        Crow.isGliding = not Crow.isGliding
+        Crow.switchFlyTick = 0
+    end
+end
+
+RegisterCommand('theCrow', function()
+    local playerPed = PlayerPedId()
+
+    -- Load crow animations
+    loadCrowAnimations()
+
+    -- Crow already exists, remove
+    if Crow.ped ~= nil then
+        -- Make crow fly away
+        Crow:ascend(playerPed, 400, 10.0, true)
+
+        -- Delete
+        DeleteEntity(Crow.ped)
+        Crow.ped = nil
+        return
+    end
+
+    -- Create crow ped
+    Crow.ped = Crow:createCrow(playerPed)
+
+    -- Add crow to group
+    local playerGroup = GetPedGroupIndex(playerPed)
+    SetPedAsGroupMember(Crow.ped, playerGroup)
+
+    -- Entrance from above
+    Crow:descend(playerPed, 400, 10.0)
 
     -- Thread to check player speed and change crow animation
     CreateThread(function()
         while Crow.ped ~= nil do
-            if GetEntitySpeed(playerPed) <= 1 then
+            if GetEntitySpeed(playerPed) <= 3 then
                 if not Crow.isPerched then
-                    -- Make crow do descend animation
-                    TaskPlayAnim(Crow.ped, CrowAnimations.descend.dictionary, CrowAnimations.descend.name,
-                        8.0, 8.0, -1, CrowAnimations.descend.flag, 0.0, false, false, false)
-
-                    local x = flapEndX
-                    local y = flapEndY
-                    local z = flapEndZ
-                    repeat
-                        x = x - flapIncrementX
-                        y = y - flapIncrementY
-                        z = z - flapIncrementZ
-
-                        AttachEntityToEntity(Crow.ped, playerPed, -1,
-                            x, y, z,
-                            0, 0, 0, false, false, false, true, 2, true)
-
-                        Wait(1)
-                    until x >= flapStartX and y >= flapStartY and z <= flapStartZ
-
-                    -- Make crow do land animation
-                    local animTime = GetAnimDuration(CrowAnimations.land.dictionary,
-                        CrowAnimations.land.name)
-                    TaskPlayAnim(Crow.ped, CrowAnimations.land.dictionary, CrowAnimations.land.name,
-                        8.0, 8.0, -1, CrowAnimations.land.flag, 0.0, false, false, false)
-
-                    Wait(animTime * 1000)
-
-                    -- Make crow do idle animation
-                    TaskPlayAnim(Crow.ped, CrowAnimations.idle.dictionary, CrowAnimations.idle.name,
-                        8.0, 8.0, -1, CrowAnimations.idle.flag, 0.0, false, false, false)
-
-                    -- Detach before re-attaching
-                    DetachEntity(Crow.ped, false, false)
-
-                    -- Attach crow ped to player's shoulder
-                    AttachEntityToEntity(Crow.ped, playerPed, boneIndex,
-                        idleX, idleY, idleZ,
-                        rotX, rotY, rotZ, false, false, false, true, 2, true)
-
-                    Crow.isPerched = true
+                    -- Make crow perch to player's shoulder
+                    Crow:descend(playerPed, 200, 1.0)
                 end
             else
                 if Crow.isPerched then
-                    -- Make crow do fly animation
-                    TaskPlayAnim(Crow.ped, CrowAnimations.takeoff.dictionary, CrowAnimations.takeoff.name,
-                        8.0, 8.0, -1, CrowAnimations.takeoff.flag, 0.0, false, false, false)
-
-                    local x = flapStartX
-                    local y = flapStartY
-                    local z = flapStartZ
-                    repeat
-                        x = x + flapIncrementX
-                        y = y + flapIncrementY
-                        z = z + flapIncrementZ
-
-                        AttachEntityToEntity(Crow.ped, playerPed, -1,
-                            x, y, z,
-                            0, 0, 0, false, false, false, true, 2, true)
-
-                        Wait(1)
-                    until x <= flapEndX and y <= flapEndY and z >= flapEndZ
-
-                    -- Make crow do ascend animation
-                    local animTime = GetAnimDuration(CrowAnimations.ascend.dictionary,
-                        CrowAnimations.ascend.name)
-                    TaskPlayAnim(Crow.ped, CrowAnimations.ascend.dictionary, CrowAnimations.ascend.name,
-                        8.0, 8.0, -1, CrowAnimations.ascend.flag, 0.0, false, false, false)
-
-                    Wait(animTime * 1000)
-
-                    -- Make crow do fly animation
-                    TaskPlayAnim(Crow.ped, CrowAnimations.flapping.dictionary, CrowAnimations.flapping.name,
-                        8.0, 8.0, -1, CrowAnimations.flapping.flag, 0.0, false, false, false)
-
-                    -- Detach before re-attaching
-                    DetachEntity(Crow.ped, false, false)
-
-                    -- Attach crow ped behind player, don't attach to bone for better looking animation
-                    AttachEntityToEntity(Crow.ped, playerPed, -1,
-                        flapEndX, flapEndY, flapEndZ,
-                        0, 0, 0, false, false, false, true, 2, true)
-
-                    Crow.isPerched = false
-                    Crow.tick = 0
+                    -- Make crow fly around player's side
+                    Crow:ascend(playerPed, 200, 1.0, false)
                 else
-                    if Crow.tick == Crow.tickMax then
-                        if Crow.isGliding then
-                            TaskPlayAnim(Crow.ped, CrowAnimations.flapping.dictionary, CrowAnimations.flapping.name,
-                                8.0, 8.0, -1, CrowAnimations.flapping.flag, 0.0, false, false, false)
-                        else
-                            TaskPlayAnim(Crow.ped, CrowAnimations.glide.dictionary, CrowAnimations.glide.name,
-                                8.0, 8.0, -1, CrowAnimations.glide.flag, 0.0, false, false, false)
-                        end
-
-                        Crow.isGliding = not Crow.isGliding
-                        Crow.tick = 0
-                    end
+                    -- Toggle between flying/gliding animation
+                    Crow:switchFlyAnimation()
                 end
             end
 
-            Crow.tick = Crow.tick + 1
+            -- Increase
+            Crow.switchFlyTick = Crow.switchFlyTick + 1
             Wait(500)
         end
 
