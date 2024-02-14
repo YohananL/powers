@@ -197,6 +197,7 @@ RegisterCommand('superJump', function()
                 local x, y, z = table.unpack(getPushVelocity(playerPed))
                 SetEntityVelocity(playerPed, x, y, z)
 
+                -- Only add the explosion effect when ped is on the ground
                 if not IsEntityInAir(playerPed) then
                     local coords = GetEntityCoords(playerPed)
                     AddExplosion(coords.x, coords.y, coords.z, grenadeType, 0, true, false, 0, true)
@@ -210,6 +211,7 @@ RegisterCommand('superJump', function()
                 SetEntityVelocity(playerPed, x, y, originalZ)
             end
 
+            -- If ped is in the air, give the ped a parachute
             if not GetIsPedGadgetEquipped(playerPed, GetHashKey("gadget_parachute")) then
                 if IsEntityInAir(playerPed) then
                     GiveWeaponToPed(playerPed, GetHashKey("gadget_parachute"), 1, false, false)
