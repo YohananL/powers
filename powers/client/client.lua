@@ -197,8 +197,8 @@ RegisterCommand('superJump', function()
                 local x, y, z = table.unpack(getPushVelocity(playerPed))
                 SetEntityVelocity(playerPed, x, y, z)
 
-                -- Only add the explosion effect when ped is on the ground
-                if not IsEntityInAir(playerPed) then
+                -- Only add the explosion effect when ped is on foot and not in the air
+                if IsPedOnFoot(playerPed) and not IsEntityInAir(playerPed) then
                     local coords = GetEntityCoords(playerPed)
                     AddExplosion(coords.x, coords.y, coords.z, grenadeType, 0, true, false, 0, true)
                 end
@@ -231,6 +231,36 @@ end, false)
 
 local flameOnEnabled = false
 
+function flameAnimation(playerPed)
+    local flameDictionary = 'anim@scripted@island@special_peds@dave@hs4_dave_stage3_ig7'
+    local flameAnimation = 'namaste'
+    RequestAnimDict(flameDictionary)
+    repeat
+        Wait(0)
+    until HasAnimDictLoaded(flameDictionary)
+
+    -- 49 Flag = Upper body only and controllable, odd number loop infinitely
+    TaskPlayAnim(playerPed, flameDictionary, flameAnimation, 8.0, 8.0, -1, 49,
+        0, false, false, false)
+
+    RemoveAnimDict(flameDictionary)
+end
+
+function tiredAnimation(playerPed)
+    local tiredDictionary = 'rcmfanatic1out_of_breath'
+    local tiredAnimation = 'p_zero_tired_01'
+    RequestAnimDict(tiredDictionary)
+    repeat
+        Wait(0)
+    until HasAnimDictLoaded(tiredDictionary)
+
+    -- 48 Flag = Upper body only and controllable, even number play once
+    TaskPlayAnim(playerPed, tiredDictionary, tiredAnimation, 8.0, 8.0, -1, 48,
+        0, false, false, false)
+
+    RemoveAnimDict(tiredDictionary)
+end
+
 RegisterCommand('flameOn', function()
     local playerPed = PlayerPedId()
     local grenadeType = 3 -- MOLOTOV
@@ -238,21 +268,55 @@ RegisterCommand('flameOn', function()
 
     CreateThread(function()
         StartEntityFire(playerPed)
+        flameAnimation(playerPed)
         while flameOnEnabled do
             SetEntityHealth(playerPed, 200)
             Wait(1)
         end
         StopEntityFire(playerPed)
+        ClearPedTasks(playerPed)
+        tiredAnimation(playerPed)
     end)
 
     CreateThread(function()
         local coords = GetEntityCoords(playerPed)
+        local offsetCoords
+        local flameOffset = 3.0
+        local flameNorthOffset = flameOffset * 2
+
         while flameOnEnabled do
             coords = GetEntityCoords(playerPed)
-            AddExplosion(coords.x, coords.y, coords.z, grenadeType, 1.0, false, false, 0, false)
-            Wait(5000)
+            AddExplosion(coords.x, coords.y, coords.z, grenadeType, 0.0, false, false, 0)
+
+            for index = 1.0, flameOffset do
+                offsetCoords = GetOffsetFromEntityInWorldCoords(playerPed, index, 0.0, 0.0)
+                AddExplosion(offsetCoords.x, offsetCoords.y, coords.z, grenadeType, 0.0, false, false, 0)
+                Wait(50)
+
+                offsetCoords = GetOffsetFromEntityInWorldCoords(playerPed, -index, 0.0, 0.0)
+                AddExplosion(offsetCoords.x, offsetCoords.y, coords.z, grenadeType, 0.0, false, false, 0)
+                Wait(50)
+
+                offsetCoords = GetOffsetFromEntityInWorldCoords(playerPed, 0.0, -index, 0.0)
+                AddExplosion(offsetCoords.x, offsetCoords.y, coords.z, grenadeType, 0.0, false, false, 0)
+                Wait(50)
+            end
+
+            for index = 1.0, flameNorthOffset do
+                offsetCoords = GetOffsetFromEntityInWorldCoords(playerPed, 0.0, index, 0.0)
+                AddExplosion(offsetCoords.x, offsetCoords.y, coords.z, grenadeType, 0.0, false, false, 0)
+                Wait(50)
+            end
+
+            Wait(10000)
         end
+
         StopFireInRange(coords.x, coords.y, coords.z, 25.0)
+        Wait(1000)
+        repeat
+            SetEntityHealth(playerPed, 200)
+            Wait(0)
+        until not IsEntityOnFire(playerPed)
     end)
 end, false)
 
