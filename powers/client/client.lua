@@ -157,8 +157,11 @@ RegisterCommand('+freezeEntity', function()
         local rotX, rotY, rotZ = table.unpack(GetEntityRotation(frozenEntity))
 
         TaskPlayAnimAdvanced(frozenEntity, dictionary, name,
-            x, y, z + 0.5, rotX, rotY, rotZ,
+            x, y, z + 1.0, rotX, rotY + 180, rotZ,
             8.0, 8.0, -1, 2, 1.0, false, false)
+
+        StartEntityFire(frozenEntity)
+        SetEntityInvincible(frozenEntity, true)
     end
 end, false)
 
@@ -171,6 +174,8 @@ RegisterCommand('-freezeEntity', function()
     -- Unfreeze entity
     FreezeEntityPosition(frozenEntity, false)
     StopAnimTask(frozenEntity, dictionary, name, 1.0)
+    StopEntityFire(frozenEntity)
+    SetEntityInvincible(frozenEntity, false)
 end, false)
 
 --- ============================
@@ -268,12 +273,13 @@ RegisterCommand('flameOn', function()
 
     CreateThread(function()
         StartEntityFire(playerPed)
+        SetEntityInvincible(playerPed, true)
         flameAnimation(playerPed)
         while flameOnEnabled do
-            SetEntityHealth(playerPed, 200)
-            Wait(1)
+            Wait(100)
         end
         StopEntityFire(playerPed)
+        SetEntityInvincible(playerPed, false)
         ClearPedTasks(playerPed)
         tiredAnimation(playerPed)
     end)
@@ -312,11 +318,6 @@ RegisterCommand('flameOn', function()
         end
 
         StopFireInRange(coords.x, coords.y, coords.z, 25.0)
-        Wait(1000)
-        repeat
-            SetEntityHealth(playerPed, 200)
-            Wait(0)
-        until not IsEntityOnFire(playerPed)
     end)
 end, false)
 
