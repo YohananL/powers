@@ -122,10 +122,8 @@ end, false)
 ---           Freeze
 --- ============================
 local frozenEntity = nil
-local dictionary = 'nm@hands'
-local name = 'hands_up'
--- local dictionary = 'skydive@base'
--- local name = 'free_idle'
+local freezeDictionary = 'nm@hands'
+local freezeAnimation = 'flat_floor'
 
 RegisterKeyMapping('+freezeEntity', 'Freeze', 'keyboard', Config.Settings.freezeBind)
 RegisterCommand('+freezeEntity', function()
@@ -133,9 +131,8 @@ RegisterCommand('+freezeEntity', function()
 
     -- Get entity in front of player using raycast
     frozenEntity = GetEntInFrontOfPlayer(playerPed, 10.0)
-    -- frozenEntity = exports.qbUtil:raycast()
 
-    -- If not a number, stop
+    -- If not an entity, stop
     if tostring(type(frozenEntity)) ~= 'number' then
         frozenEntity = nil
         return
@@ -148,15 +145,15 @@ RegisterCommand('+freezeEntity', function()
     if GetEntityType(frozenEntity) == 1 then
         ClearPedTasksImmediately(frozenEntity)
 
-        RequestAnimDict(dictionary)
+        RequestAnimDict(freezeDictionary)
         repeat
             Wait(100)
-        until HasAnimDictLoaded(dictionary)
+        until HasAnimDictLoaded(freezeDictionary)
 
         local x, y, z = table.unpack(GetEntityCoords(frozenEntity))
         local rotX, rotY, rotZ = table.unpack(GetEntityRotation(frozenEntity))
 
-        TaskPlayAnimAdvanced(frozenEntity, dictionary, name,
+        TaskPlayAnimAdvanced(frozenEntity, freezeDictionary, freezeAnimation,
             x, y, z + 1.0, rotX, rotY + 180, rotZ,
             8.0, 8.0, -1, 2, 1.0, false, false)
 
@@ -173,9 +170,102 @@ RegisterCommand('-freezeEntity', function()
 
     -- Unfreeze entity
     FreezeEntityPosition(frozenEntity, false)
-    StopAnimTask(frozenEntity, dictionary, name, 1.0)
+    StopAnimTask(frozenEntity, freezeDictionary, freezeAnimation, 1.0)
     StopEntityFire(frozenEntity)
     SetEntityInvincible(frozenEntity, false)
+end, false)
+
+--- ============================
+---          Ice Field
+--- ============================
+
+local iceFields = {}
+local iceFieldLimit = 15
+local iceModelHash = `gaudeee_ice`
+local isIceFieldEnabled = false
+
+function loadIceFieldModel()
+    RequestModel(iceModelHash)
+    repeat
+        Wait(100)
+    until HasModelLoaded(iceModelHash)
+end
+
+RegisterCommand('iceField', function()
+    if isIceFieldEnabled then
+        -- Delete all ice field objects
+        for _ = 1, #iceFields do
+            DeleteEntity(iceFields[1])
+            table.remove(iceFields, 1)
+        end
+
+        -- Reset the ice field property
+        isIceFieldEnabled = false
+
+        -- Clear the weather
+        ClearWeatherTypePersist()
+        return
+    end
+
+    -- Load the ice prop model
+    loadIceFieldModel()
+
+    -- Thread to create the ice field
+    CreateThread(function()
+        local playerPed = PlayerPedId()
+        local distanceFromPed = 3
+        local x, y, z
+        local index = 1
+
+        while isIceFieldEnabled do
+            local random = math.random()
+
+            -- Get the x and y coords based on the random value
+            x = random * distanceFromPed
+            y = distanceFromPed - x
+
+            -- If greater than 0.5, make x negative
+            if math.random() > 0.5 then
+                x = -x
+            end
+
+            -- If greater than 0.5, make y negative
+            if math.random() > 0.5 then
+                y = -y
+            end
+
+            -- Create the ice field object and place it on the ground
+            x, y, z = table.unpack(GetOffsetFromEntityInWorldCoords(playerPed, x, y, 0.0))
+            table.insert(iceFields, CreateObject(iceModelHash, x, y, z, true, false, false))
+            PlaceObjectOnGroundProperly(iceFields[index])
+
+            -- Increment the index
+            index = index + 1
+
+            -- If the ice field limit is reached, remove the oldest one
+            if index == iceFieldLimit then
+                DeleteEntity(iceFields[1])
+                table.remove(iceFields, 1)
+                index = index - 1
+            end
+
+            Wait(500)
+        end
+    end)
+
+    -- Unload the ice prop model
+    SetModelAsNoLongerNeeded(iceModelHash)
+
+    -- Set the isIceFieldEnabled property to true
+    isIceFieldEnabled = true
+
+    -- Thread to set the weather type to snow
+    CreateThread(function()
+        while isIceFieldEnabled do
+            SetWeatherTypeNowPersist('BLIZZARD')
+            Wait(0)
+        end
+    end)
 end, false)
 
 --- ============================
@@ -272,15 +362,29 @@ RegisterCommand('flameOn', function()
     flameOnEnabled = not flameOnEnabled
 
     CreateThread(function()
+        -- Set ped on fire
         StartEntityFire(playerPed)
+
+        -- Make ped invincible
         SetEntityInvincible(playerPed, true)
+
+        -- Play the flame animation
         flameAnimation(playerPed)
+
         while flameOnEnabled do
             Wait(100)
         end
+
+        -- Stop ped being on fire
         StopEntityFire(playerPed)
+
+        -- Make ped no longer invincible
         SetEntityInvincible(playerPed, false)
+
+        -- Clear the animation
         ClearPedTasks(playerPed)
+
+        -- Play the tired animation
         tiredAnimation(playerPed)
     end)
 
@@ -291,9 +395,13 @@ RegisterCommand('flameOn', function()
         local flameNorthOffset = flameOffset * 2
 
         while flameOnEnabled do
+            -- Get ped coords
             coords = GetEntityCoords(playerPed)
+
+            -- Add explosion to ped's coords
             AddExplosion(coords.x, coords.y, coords.z, grenadeType, 0.0, false, false, 0)
 
+            -- Add explosion to ped's east, west, and south coords based on flame offset distance
             for index = 1.0, flameOffset do
                 offsetCoords = GetOffsetFromEntityInWorldCoords(playerPed, index, 0.0, 0.0)
                 AddExplosion(offsetCoords.x, offsetCoords.y, coords.z, grenadeType, 0.0, false, false, 0)
@@ -308,6 +416,7 @@ RegisterCommand('flameOn', function()
                 Wait(50)
             end
 
+            -- Add explosion to ped's north coords based on flame north offset distance
             for index = 1.0, flameNorthOffset do
                 offsetCoords = GetOffsetFromEntityInWorldCoords(playerPed, 0.0, index, 0.0)
                 AddExplosion(offsetCoords.x, offsetCoords.y, coords.z, grenadeType, 0.0, false, false, 0)
@@ -317,6 +426,7 @@ RegisterCommand('flameOn', function()
             Wait(10000)
         end
 
+        -- Stop all fires within range
         StopFireInRange(coords.x, coords.y, coords.z, 25.0)
     end)
 end, false)
