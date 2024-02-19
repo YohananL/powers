@@ -367,6 +367,9 @@ RegisterCommand('flameOn', function()
     flameOnEnabled = not flameOnEnabled
 
     CreateThread(function()
+        -- Clear ped tasks
+        ClearPedTasksImmediately(playerPed)
+
         -- Set ped on fire
         StartEntityFire(playerPed)
 
@@ -387,7 +390,7 @@ RegisterCommand('flameOn', function()
         SetEntityInvincible(playerPed, false)
 
         -- Clear the animation
-        ClearPedTasks(playerPed)
+        ClearPedTasksImmediately(playerPed)
 
         -- Play the tired animation
         tiredAnimation(playerPed)
