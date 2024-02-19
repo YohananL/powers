@@ -327,15 +327,20 @@ end, false)
 local flameOnEnabled = false
 
 function flameAnimation(playerPed)
-    local flameDictionary = 'anim@scripted@island@special_peds@dave@hs4_dave_stage3_ig7'
-    local flameAnimation = 'namaste'
+    -- local flameDictionary = 'anim@scripted@island@special_peds@dave@hs4_dave_stage3_ig7'
+    -- local flameAnimation = 'namaste'
+    local flameDictionary = 'rcmcollect_paperleadinout@'
+    local flameAnimation = 'meditiate_idle'
     RequestAnimDict(flameDictionary)
     repeat
         Wait(0)
     until HasAnimDictLoaded(flameDictionary)
 
-    -- 49 Flag = Upper body only and controllable, odd number loop infinitely
-    TaskPlayAnim(playerPed, flameDictionary, flameAnimation, 8.0, 8.0, -1, 49,
+    -- -- 49 Flag = Upper body only and controllable, odd number loop infinitely
+    -- TaskPlayAnim(playerPed, flameDictionary, flameAnimation, 8.0, 8.0, -1, 49,
+    --     0, false, false, false)
+
+    TaskPlayAnim(playerPed, flameDictionary, flameAnimation, 8.0, 8.0, -1, 1,
         0, false, false, false)
 
     RemoveAnimDict(flameDictionary)
